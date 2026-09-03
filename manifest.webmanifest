@@ -1,9 +1,1 @@
-{
-  "name":"Le mie ore",
-  "short_name":"Le mie ore",
-  "start_url":".",
-  "display":"standalone",
-  "background_color":"#f2f2f7",
-  "theme_color":"#111827",
-  "lang":"it"
-}
+{"name":"Le mie ore","short_name":"Le mie ore","start_url":"./","display":"standalone","background_color":"#f2f2f7","theme_color":"#111827","lang":"it","icons":[]}

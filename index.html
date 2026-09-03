@@ -15,9 +15,10 @@ main{max-width:650px;margin:auto;padding:16px;padding-bottom:40px}h1{font-size:3
 .card{background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000d}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{background:#f7f7fa;border-radius:14px;padding:13px;font-size:13px;color:#666}.stat b{display:block;font-size:22px;color:#111;margin-top:4px}
 button,input,select{font:inherit;width:100%;padding:13px;border:1px solid #ddd;border-radius:12px;background:#fff}button{border:0;font-weight:700}
-.green{background:#16a34a;color:white}.red{background:#dc2626;color:white}.dark{background:#111827;color:white}.gray{background:#e5e7eb;color:#111}
+.green{background:#16a34a;color:white}.red{background:#dc2626;color:white}.dark{background:#111827;color:white}.gray{background:#e5e7eb;color:#111}.orange{background:#f59e0b;color:white}
 label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}.hidden{display:none}.timer{text-align:center;font-size:38px;font-weight:800;margin:10px}
 .entry{padding:13px 0;border-top:1px solid #eee}.entry:first-child{border-top:0}.line{display:flex;justify-content:space-between;gap:10px}.small{font-size:13px;color:#666;margin-top:4px}.actions{display:flex;gap:8px;margin-top:8px}.actions button{padding:9px;font-size:12px}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:5px}.paid{background:#dcfce7;color:#166534}.due{background:#fef3c7;color:#92400e}
 h2,h3{margin:4px 0 12px}.note{font-size:12px;color:#666;line-height:1.4}
 </style>
 </head>
@@ -28,9 +29,9 @@ h2,h3{margin:4px 0 12px}.note{font-size:12px;color:#666;line-height:1.4}
 <div class="card">
 <div class="grid">
 <div class="stat">Ore mese<b id="hours">0h 00m</b></div>
-<div class="stat">Totale mese<b id="total">€0,00</b></div>
-<div class="stat">Compenso<b id="pay">€0,00</b></div>
-<div class="stat">Rimborsi<b id="refund">€0,00</b></div>
+<div class="stat">Totale maturato<b id="total">€0,00</b></div>
+<div class="stat">💰 Incassato<b id="paid">€0,00</b></div>
+<div class="stat">⏳ Da incassare<b id="due">€0,00</b></div>
 </div>
 </div>
 
@@ -47,9 +48,10 @@ h2,h3{margin:4px 0 12px}.note{font-size:12px;color:#666;line-height:1.4}
 <button id="new" class="dark">＋ INSERISCI MANUALMENTE</button>
 <div id="form" class="hidden">
 <label>Data</label><input id="date" type="date">
-<label>Tipo</label><select id="type"><option>Esame</option><option>Commissione</option><option>Altro</option></select>
+<label>Tipo</label><select id="type"><option>Esame</option><option>Simulatore</option><option>Commissione</option><option>Altro</option></select>
 <div class="grid"><div><label>Inizio</label><input id="from" type="time"></div><div><label>Fine</label><input id="to" type="time"></div></div>
 <label>Auto</label><select id="car"><option value="school">Auto autoscuola</option><option value="mine">La mia auto (+ €30)</option><option value="none">Nessuna</option></select>
+<label>Pagamento</label><select id="payment"><option value="paid">💰 Pagato subito</option><option value="due">⏳ Da pagare</option></select>
 <div class="actions"><button id="save" class="dark">Salva</button><button id="cancel" class="gray">Annulla</button></div>
 </div>
 </div>
@@ -68,31 +70,33 @@ h2,h3{margin:4px 0 12px}.note{font-size:12px;color:#666;line-height:1.4}
 </main>
 <script>
 const RATE=10,REFUND=30,key="le_mie_ore_v1";
-let entries=[];try{entries=JSON.parse(localStorage.getItem(key)||"[]")}catch(e){}
+let entries=[];try{entries=JSON.parse(localStorage.getItem(key)||"[]")}catch(e){entries=[]}
 const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,"0");
 const today=()=>{let d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
 const curMonth=()=>today().slice(0,7);
 const euro=n=>new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"}).format(n);
 function duration(a,b){let x=a.split(":").map(Number),y=b.split(":").map(Number),m=y[0]*60+y[1]-x[0]*60-x[1];if(m<0)m+=1440;return m}
 function persist(){localStorage.setItem(key,JSON.stringify(entries))}
+function normalizedPayment(e){return e.payment==="due"?"due":"paid"}
 function render(){
  let mo=$("month").value||curMonth(),a=entries.filter(e=>e.date.startsWith(mo)).sort((x,y)=>(y.date+y.from).localeCompare(x.date+x.from));
- let mins=0,pay=0,refund=0;a.forEach(e=>{mins+=e.minutes;pay+=e.pay;refund+=e.refund});
- $("hours").textContent=Math.floor(mins/60)+"h "+pad(mins%60)+"m";$("pay").textContent=euro(pay);$("refund").textContent=euro(refund);$("total").textContent=euro(pay+refund);
- $("list").innerHTML=a.length?a.map(e=>{let c=e.car==="mine"?"🚗 Mia auto":e.car==="school"?"🚘 Auto autoscuola":"— Nessuna";return `<div class="entry"><div class="line"><b>${e.date.split("-").reverse().join("/")} · ${e.type}</b><b>${euro(e.pay+e.refund)}</b></div><div class="small">${e.from} → ${e.to} · ${Math.floor(e.minutes/60)}h ${pad(e.minutes%60)}m · ${c}</div><div class="actions"><button class="gray" onclick="del(${e.id})">Elimina</button></div></div>`}).join(""):'<div class="small">Nessuna registrazione.</div>';
+ let mins=0,paid=0,due=0;a.forEach(e=>{mins+=e.minutes;let total=e.pay+e.refund;if(normalizedPayment(e)==="due")due+=total;else paid+=total});
+ $("hours").textContent=Math.floor(mins/60)+"h "+pad(mins%60)+"m";$("paid").textContent=euro(paid);$("due").textContent=euro(due);$("total").textContent=euro(paid+due);
+ $("list").innerHTML=a.length?a.map(e=>{let c=e.car==="mine"?"🚗 Mia auto (+€30)":e.car==="school"?"🚘 Auto autoscuola":"— Nessuna auto";let p=normalizedPayment(e);let badge=p==="due"?'<span class="badge due">DA PAGARE</span>':'<span class="badge paid">PAGATO</span>';let amount=euro(e.pay+e.refund);return `<div class="entry"><div class="line"><b>${e.date.split("-").reverse().join("/")} · ${e.type} ${badge}</b><b>${amount}</b></div><div class="small">${e.from} → ${e.to} · ${Math.floor(e.minutes/60)}h ${pad(e.minutes%60)}m · ${c}</div><div class="actions"><button class="gray" onclick="del(${e.id})">Elimina</button>${p==="due"?`<button class="orange" onclick="markPaid(${e.id})">Segna pagato</button>`:""}</div></div>`}).join(""):'<div class="small">Nessuna registrazione.</div>';
 }
 window.del=id=>{if(confirm("Eliminare questa registrazione?")){entries=entries.filter(e=>e.id!==id);persist();render()}};
-function openForm(){ $("form").classList.remove("hidden");$("date").value=today();$("from").value="";$("to").value=""}
+window.markPaid=id=>{let e=entries.find(x=>x.id===id);if(e){e.payment="paid";persist();render()}};
+function openForm(reset=true){$("form").classList.remove("hidden");if(reset){$("date").value=today();$("from").value="";$("to").value="";$("type").value="Esame";$("car").value="school";$("payment").value="paid"}}
 function closeForm(){$("form").classList.add("hidden")}
-$("new").onclick=openForm;$("cancel").onclick=closeForm;$("month").onchange=render;
-$("save").onclick=()=>{let date=$("date").value,from=$("from").value,to=$("to").value,type=$("type").value,car=$("car").value;if(!date||!from||!to)return alert("Inserisci data, inizio e fine.");let m=duration(from,to);if(!m)return alert("Controlla gli orari.");entries.push({id:Date.now(),date,from,to,type,car,minutes:m,pay:m/60*RATE,refund:car==="mine"?REFUND:0});persist();closeForm();render()};
+$("new").onclick=()=>openForm(true);$("cancel").onclick=closeForm;$("month").onchange=render;
+$("save").onclick=()=>{let date=$("date").value,from=$("from").value,to=$("to").value,type=$("type").value,car=$("car").value,payment=$("payment").value;if(!date||!from||!to)return alert("Inserisci data, inizio e fine.");let m=duration(from,to);if(!m)return alert("Controlla gli orari.");entries.push({id:Date.now(),date,from,to,type,car,payment,minutes:m,pay:m/60*RATE,refund:car==="mine"?REFUND:0});persist();closeForm();render()};
 let running=localStorage.getItem("le_mie_ore_running");
 function tick(){if(!running)return;let s=Math.floor((Date.now()-Number(running))/1000);$("timer").textContent=pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60);setTimeout(tick,1000)}
 $("start").onclick=()=>{running=Date.now().toString();localStorage.setItem("le_mie_ore_running",running);$("start").classList.add("hidden");$("work").classList.remove("hidden");tick()};
-$("stop").onclick=()=>{if(!running)return;let d=new Date(Number(running)),e=new Date();$("date").value=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());$("from").value=pad(d.getHours())+":"+pad(d.getMinutes());$("to").value=pad(e.getHours())+":"+pad(e.getMinutes());localStorage.removeItem("le_mie_ore_running");running=null;$("start").classList.remove("hidden");$("work").classList.add("hidden");openForm();$("from").value=$("date").value===today()?$("from").value:$("from").value};
-$("export").onclick=()=>{let blob=new Blob([JSON.stringify(entries,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="backup_le_mie_ore.json";a.click();URL.revokeObjectURL(a.href)};
+$("stop").onclick=()=>{if(!running)return;let d=new Date(Number(running)),e=new Date();let date=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());let from=pad(d.getHours())+":"+pad(d.getMinutes());let to=pad(e.getHours())+":"+pad(e.getMinutes());localStorage.removeItem("le_mie_ore_running");running=null;$("start").classList.remove("hidden");$("work").classList.add("hidden");openForm(true);$("date").value=date;$("from").value=from;$("to").value=to};
+$("export").onclick=()=>{let blob=new Blob([JSON.stringify(entries,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="backup_le_mie_ore.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 $("import").onclick=()=>$("file").click();
-$("file").onchange=ev=>{let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!Array.isArray(x))throw 0;entries=x;persist();render();alert("Backup importato.");}catch(e){alert("Backup non valido.")}};r.readAsText(f)};
+$("file").onchange=ev=>{let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!Array.isArray(x))throw 0;entries=x;persist();render();alert("Backup importato.")}catch(e){alert("Backup non valido.")}};r.readAsText(f)};
 $("month").value=curMonth();render();if(running){$("start").classList.add("hidden");$("work").classList.remove("hidden");tick()}
 if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{})}
 </script>
